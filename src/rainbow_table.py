@@ -37,11 +37,11 @@ class RainbowTable:
 
     def __reduce(self, hash, step):
         data = hash + str(step)
-        random.seed(data)
+        rng = random.Random(data)
         reduced = ""
 
         while True:
-            stop_probability = random.uniform(0, 1)
+            stop_probability = rng.uniform(0, 1)
             i = len(reduced)
 
             if i >= MIN_LENGTH and stop_probability < 0.125:
