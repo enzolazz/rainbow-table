@@ -11,7 +11,10 @@ class RainbowTable:
         self.rows = rows
         self.steps = steps
         self.alphabet = list(string.ascii_letters + string.digits + "!@#%&*()")
+
+        print("=====BUILDING TABLE...=====")
         self.table = self.__build_table()
+        print("=====TABLE BUILT=====")
 
     def __random_password(self):
         password = ""
@@ -40,6 +43,9 @@ class RainbowTable:
             if i >= MIN_LENGTH and stop_probability < 0.125:
                 break
 
+            while len(data) < (i * 4 + 4):
+                data += hash
+
             idx = (int(data[i * 4 : i * 4 + 4], 16) + step) % ALPHABET_LENGTH
             reduced += self.alphabet[idx]
 
@@ -58,3 +64,26 @@ class RainbowTable:
             table.append((start, end))
 
         return table
+
+    def check_password(self, hashed_password):
+        reduced_hash = self.__reduce(self.steps, hashed_password)
+
+        def find_password(row):
+            start_password = self.table[row][0]
+
+            for step in range(self.steps):
+                current_hash = self.__hash(start_password)
+
+                if hashed_password == current_hash:
+                    return start_password
+
+                start_password = self.__reduce(current_hash, step)
+
+        for step in range(self.steps - 1, -1, -1):
+            for row in range(self.rows):
+                if reduced_hash == self.table[row][1]:
+                    return find_password(row)
+
+                reduced_hash = self.__reduce(self.__hash(reduced_hash), step - 1)
+
+        return None
