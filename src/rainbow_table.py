@@ -70,8 +70,6 @@ class RainbowTable:
         return table
 
     def check_password(self, hashed_password):
-        reduced_hash = self.__reduce(hashed_password, self.steps - 1)
-
         def find_password(row):
             start_password = self.table[row][0]
 
@@ -82,15 +80,12 @@ class RainbowTable:
                     return start_password
 
                 start_password = self.__reduce(current_hash, step)
-
             return None
 
         for step in range(self.steps - 1, -1, -1):
+            reduced_hash = self.__reduce(hashed_password, step)
+            
             for row in range(self.rows):
                 if reduced_hash == self.table[row][1]:
                     return find_password(row)
-
-            if step > 0:
-                reduced_hash = self.__reduce(self.__hash(reduced_hash), step - 1)
-
         return None
