@@ -69,10 +69,14 @@ class RainbowTable:
 
     def __regenerate(self, start, target_hash):
         password = start
+
         for step in range(self.steps):
-            if self.__sha512_hash(password) == target_hash:
+            hashed_password = self.__sha512_hash(password)
+            if hashed_password == target_hash:
                 return password
-            password = self.__reduce(self.__sha512_hash(password), step)
+
+            password = self.__reduce(hashed_password, step)
+
         return None
 
     def check_password(self, hashed_password):
@@ -82,11 +86,12 @@ class RainbowTable:
 
             for k in range(step, self.steps):
                 candidate = self.__reduce(self.__sha512_hash(candidate), k)
-                if len(candidate) > max:
-                    max = len(candidate)
+                size_str = len(candidate)
+                if size_str > max:
+                    max = size_str
 
                 print(
-                    f"\r==> {k}:{candidate}{" " * (max-len(candidate))}",
+                    f"\r==> {k}:{candidate}{" " * (max-size_str)}",
                     end="",
                     flush=True,
                 )
