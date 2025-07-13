@@ -1,18 +1,21 @@
 import hashlib
-import string
 import random
+import string
 import time
 
+from tqdm import tqdm
+
 MIN_LENGTH = 5
-ALPHABET_LENGTH = 62
 SPECIAL_CHARS = "!@#%&*()"
+PROBABILITY = 0.125
 
 
 class RainbowTable:
     def __init__(self, rows=8000, steps=600):
         self.rows = rows
         self.steps = steps
-        self.alphabet = list(string.ascii_letters + string.digits)
+        self.alphabet = list(string.ascii_letters + string.digits + SPECIAL_CHARS)
+        self.alphabet_size = len(self.alphabet)
         self.table = self.__build_table()
 
     def __random_password(self):
@@ -21,7 +24,7 @@ class RainbowTable:
         while True:
             stop_probability = random.uniform(0, 1)
 
-            if len(password) >= MIN_LENGTH and stop_probability < 0.125:
+            if len(password) >= MIN_LENGTH and stop_probability < PROBABILITY:
                 break
 
             password += random.choice(self.alphabet)
@@ -38,20 +41,19 @@ class RainbowTable:
         reduced = ""
         while True:
             stop_probability = rng.uniform(0, 1)
-            if len(reduced) >= MIN_LENGTH and stop_probability < 0.125:
+            if len(reduced) >= MIN_LENGTH and stop_probability < PROBABILITY:
                 break
 
-            idx = rng.randint(0, ALPHABET_LENGTH - 1)
+            idx = rng.randint(0, len(self.alphabet) - 1)
             reduced += self.alphabet[idx]
 
         return reduced
 
     def __build_table(self):
-        table = []
+        table = {}
         print("==> BUILDING TABLE...")
         start_time = time.perf_counter()
-        for row in range(self.rows):
-            print(f"\rBuilding row: {row+1}/{self.rows}", end="", flush=True)
+        for _ in tqdm(range(self.rows), desc="Building rows", unit="row"):
             start = self.__random_password()
 
             end = start
@@ -59,11 +61,20 @@ class RainbowTable:
                 h = self.__sha512_hash(end)
                 end = self.__reduce(h, step)
 
-            table.append((start, end))
+            if end not in table:
+                table[end] = []
+
+            table[end].append(start)
+
         end_time = time.perf_counter()
-        print(f"\r==> TABLE BUILT{" "* 20}", flush=True)
+        print(f"\r==> TABLE BUILT{' ' * 20}", flush=True)
         print(f"==> Time: {end_time - start_time:.2f}s")
-        print(f"==> Random row: { table[random.randint(0, self.rows) ]}")
+        
+        end = random.choice(list(table.keys()))
+        lista = table[end]
+        print(f"==> Random rows:")
+        for row in lista:
+            print(f"start: {row} -> end: {end}")
 
         return table
 
@@ -80,25 +91,16 @@ class RainbowTable:
         return None
 
     def check_password(self, hashed_password):
-        max = 0
         for step in range(self.steps - 1, -1, -1):
-            candidate = hashed_password
+            candidate = self.__reduce(hashed_password, step)
 
-            for k in range(step, self.steps):
+            for k in range(step + 1, self.steps):
                 candidate = self.__reduce(self.__sha512_hash(candidate), k)
-                size_str = len(candidate)
-                if size_str > max:
-                    max = size_str
 
-                print(
-                    f"\r==> {k}:{candidate}{" " * (max-size_str)}",
-                    end="",
-                    flush=True,
-                )
+            if candidate in self.table:
+                for start in self.table[candidate]:
+                    password = self.__regenerate(start, hashed_password)
+                    if password:
+                        return password
 
-            for start, end in self.table:
-                if candidate == end:
-                    return self.__regenerate(start, hashed_password)
-
-        print()
         return None
