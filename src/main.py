@@ -1,17 +1,18 @@
-from rainbow_table import RainbowTable
 import argparse
+
+from rainbow_table import RainbowTable
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="A RainbowTable built in python for a bonus college assignment."
     )
 
-    parser.add_argument("--rows", type=int, help="Table row size.", default=12000)
+    parser.add_argument("--rows", type=int, help="Table row size.", default=20000)
     parser.add_argument(
         "--steps",
         type=int,
         help="How many steps (cols) the table should have.",
-        default=1000,
+        default=2000,
     )
 
     args = parser.parse_args()
@@ -28,4 +29,9 @@ if __name__ == "__main__":
             print("Nao achou!")
         print("\n----\n")
 
-        hashed_password = str(input("Digite o hash da senha: "))
+        hashed_password = str(
+            input("Digite o hash da senha (ou pressione Enter para sair): ")
+        ).strip()
+        print()
+        if not hashed_password:
+            break
