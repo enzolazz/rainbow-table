@@ -2,7 +2,10 @@ import hashlib
 import random
 import string
 import time
+import json
 
+
+from collections import defaultdict
 from tqdm import tqdm
 
 MIN_LENGTH = 5
@@ -11,12 +14,22 @@ PROBABILITY = 0.125
 
 
 class RainbowTable:
-    def __init__(self, rows=8000, steps=600):
+    def __init__(self, rows, steps, table=None):
         self.rows = rows
         self.steps = steps
         self.alphabet = list(string.ascii_letters + string.digits + SPECIAL_CHARS)
         self.alphabet_size = len(self.alphabet)
-        self.table = self.__build_table()
+
+        if not table:
+            self.table = defaultdict(list)
+            self.__build_table()
+            self.__persist_table()
+        else:
+            self.table = table
+
+    def __persist_table(self):
+        with open("table.json", "w") as file:
+            json.dump(dict(self.table), file, indent=2)
 
     def __random_password(self):
         password = ""
@@ -50,7 +63,6 @@ class RainbowTable:
         return reduced
 
     def __build_table(self):
-        table = {}
         print("==> BUILDING TABLE...")
         start_time = time.perf_counter()
         for _ in tqdm(range(self.rows), desc="Building rows", unit="row"):
@@ -61,22 +73,15 @@ class RainbowTable:
                 h = self.__sha512_hash(end)
                 end = self.__reduce(h, step)
 
-            if end not in table:
-                table[end] = []
-
-            table[end].append(start)
+            self.table[end].append(start)
 
         end_time = time.perf_counter()
         print(f"\r==> TABLE BUILT{' ' * 20}", flush=True)
         print(f"==> Time: {end_time - start_time:.2f}s")
-        
-        end = random.choice(list(table.keys()))
-        lista = table[end]
-        print(f"==> Random rows:")
-        for row in lista:
-            print(f"start: {row} -> end: {end}")
 
-        return table
+        end = random.choice(list(self.table.keys()))
+        start_list = ",".join(self.table[end])
+        print(f"==> Random row: ({start_list}) -> {end}")
 
     def __regenerate(self, start, target_hash):
         password = start
@@ -102,5 +107,4 @@ class RainbowTable:
                     password = self.__regenerate(start, hashed_password)
                     if password:
                         return password
-
         return None
