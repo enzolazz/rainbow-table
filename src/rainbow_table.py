@@ -104,10 +104,8 @@ class RainbowTable:
 
             self.table[end].append(start)
 
-            if i % (row_count // 10) == 0:
-                self.__save()
-
         self.rows = len(self.table)
+        self.__save()
 
         end_time = time.perf_counter()
         print(f"\r==> TABLE BUILT{' ' * 20}", flush=True)
