@@ -18,10 +18,15 @@ class RainbowTable:
         self.rows = 0
         self.table = defaultdict(list)
 
-        self.__load()
+        completion = self.__load()
 
         if rows:
             self.__build_table(rows)
+            message = f"==> Added {rows} row{'s' if rows != 1 else ''}"
+        else:
+            message = f"==> Rainbow Table {completion} successfully"
+
+        print(f"{message}. Table has {self.rows} rows and {self.steps} steps.")
 
     def __load(self):
         data = self.storage.load()
@@ -29,6 +34,7 @@ class RainbowTable:
         table_dict = data.get("table", {})
         steps = data.get("steps", self.steps)
 
+        completion = "loaded"
         if steps != self.steps:
             print(
                 f"Warning: Steps in storage ({steps}) do not match given steps ({self.steps})."
@@ -45,9 +51,12 @@ class RainbowTable:
 
             table_dict = {}
             self.steps = steps
+            completion = "created"
 
         self.table = defaultdict(list, table_dict)
         self.rows = len(self.table)
+
+        return completion
 
     def __save(self):
         data = {"steps": self.steps, "table": dict(self.table)}
@@ -92,9 +101,11 @@ class RainbowTable:
         return reduced
 
     def __build_table(self, row_count):
-        print("==> BUILDING TABLE...")
+        print(
+            f"==> {settings.yellow_color}[INFO]{settings.reset_color} Building rainbow table..."
+        )
         start_time = time.perf_counter()
-        for i in tqdm(range(row_count), desc="Building rows", unit="row"):
+        for _ in tqdm(range(row_count), desc="==> Building rows", unit="row"):
             start = self.__random_password()
 
             end = start
@@ -108,7 +119,9 @@ class RainbowTable:
         self.__save()
 
         end_time = time.perf_counter()
-        print(f"\r==> TABLE BUILT{' ' * 20}", flush=True)
+        print(
+            f"==> {settings.green_color}[SUCCESS]{settings.reset_color} Rainbow table built successfully!"
+        )
         print(f"==> Time: {end_time - start_time:.2f}s")
 
         end = random.choice(list(self.table.keys()))
