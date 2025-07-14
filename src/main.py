@@ -1,18 +1,6 @@
 import argparse
-from collections import defaultdict
-import json
-
 from rainbow_table import RainbowTable
-
-
-def load_table():
-    try:
-        with open("table.json") as f:
-            loaded = json.load(f)
-
-        return defaultdict(list, loaded)
-    except FileNotFoundError:
-        return None
+from settings import settings
 
 
 if __name__ == "__main__":
@@ -20,24 +8,25 @@ if __name__ == "__main__":
         description="A RainbowTable built in python for a bonus college assignment."
     )
 
-    parser.add_argument("--rows", type=int, help="Table row size.", default=20000)
+    parser.add_argument(
+        "--rows",
+        type=int,
+        help="Rows to add to the table; If a table does not exist, creates this amount of rows.",
+        default=None,
+    )
     parser.add_argument(
         "--steps",
         type=int,
         help="How many steps (cols) the table should have.",
-        default=2000,
-    )
-    parser.add_argument(
-        "--build", type=bool, help="Build a new table from scratch.", default=False
+        default=None,
     )
 
     args = parser.parse_args()
 
-    table = None
-    if not args.build:
-        table = load_table()
+    if args.steps and not args.rows:
+        parser.error("--rows is required when --steps is specified.")
 
-    rt = RainbowTable(rows=args.rows, steps=args.steps, table=table)
+    rt = RainbowTable(rows=args.rows, steps=args.steps or settings.default_steps)
 
     hashed_password = "1e65cf1485fa6b43f090a448feb1cd8931378e4c96daf245a6d96c264e55579b59ca80519d020cb394b7e501c71386d8aeaf503206de439c9d92558c8884812d"
     while hashed_password:

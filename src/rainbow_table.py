@@ -1,43 +1,69 @@
 import hashlib
 import random
-import string
 import time
-import json
-
-
+import sys
 from collections import defaultdict
+
 from tqdm import tqdm
 
-MIN_LENGTH = 5
-SPECIAL_CHARS = "!@#%&*()"
-PROBABILITY = 0.125
+from settings import settings
+from storage import JSONStorage
 
 
 class RainbowTable:
-    def __init__(self, rows, steps, table=None):
-        self.rows = rows
+    def __init__(self, steps=settings.default_steps, rows=None):
+        self.alphabet = list(settings.alphabet)
+        self.storage = JSONStorage(settings.data_path / "table.json")
         self.steps = steps
-        self.alphabet = list(string.ascii_letters + string.digits + SPECIAL_CHARS)
-        self.alphabet_size = len(self.alphabet)
+        self.rows = 0
+        self.table = defaultdict(list)
 
-        if not table:
-            self.table = defaultdict(list)
-            self.__build_table()
-            self.__persist_table()
-        else:
-            self.table = table
+        self.__load()
 
-    def __persist_table(self):
-        with open("table.json", "w") as file:
-            json.dump(dict(self.table), file, indent=2)
+        if rows:
+            self.__build_table(rows)
+
+    def __load(self):
+        data = self.storage.load()
+
+        table_dict = data.get("table", {})
+        steps = data.get("steps", self.steps)
+
+        if steps != self.steps:
+            print(
+                f"Warning: Steps in storage ({steps}) do not match given steps ({self.steps})."
+            )
+
+            confirm = (
+                input("Do you want to continue with the given steps? (y/n): ")
+                .strip()
+                .lower()
+            )
+
+            if confirm != "y":
+                sys.exit("Exiting due to mismatch in steps.")
+
+            table_dict = {}
+            self.steps = steps
+
+        self.table = defaultdict(list, table_dict)
+        self.rows = len(self.table)
+
+    def __save(self):
+        data = {"steps": self.steps, "table": dict(self.table)}
+
+        self.storage.save(data)
 
     def __random_password(self):
         password = ""
 
         while True:
-            stop_probability = random.uniform(0, 1)
+            probability = random.uniform(0, 1)
 
-            if len(password) >= MIN_LENGTH and stop_probability < PROBABILITY:
+            if (
+                len(password) >= settings.min_password_length
+                and probability < settings.stop_probability
+            ):
                 break
 
             password += random.choice(self.alphabet)
@@ -54,18 +80,21 @@ class RainbowTable:
         reduced = ""
         while True:
             stop_probability = rng.uniform(0, 1)
-            if len(reduced) >= MIN_LENGTH and stop_probability < PROBABILITY:
+            if (
+                len(reduced) >= settings.min_password_length
+                and stop_probability < settings.stop_probability
+            ):
                 break
 
-            idx = rng.randint(0, len(self.alphabet) - 1)
+            idx = rng.randint(0, settings.alphabet_size - 1)
             reduced += self.alphabet[idx]
 
         return reduced
 
-    def __build_table(self):
+    def __build_table(self, row_count):
         print("==> BUILDING TABLE...")
         start_time = time.perf_counter()
-        for _ in tqdm(range(self.rows), desc="Building rows", unit="row"):
+        for i in tqdm(range(row_count), desc="Building rows", unit="row"):
             start = self.__random_password()
 
             end = start
@@ -74,6 +103,11 @@ class RainbowTable:
                 end = self.__reduce(h, step)
 
             self.table[end].append(start)
+
+            if i % (row_count // 10) == 0:
+                self.__save()
+
+        self.rows = len(self.table)
 
         end_time = time.perf_counter()
         print(f"\r==> TABLE BUILT{' ' * 20}", flush=True)
