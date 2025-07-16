@@ -1,6 +1,7 @@
 import argparse
 from rainbow_table import RainbowTable
 from settings import settings
+from logger import log
 
 
 if __name__ == "__main__":
@@ -8,12 +9,12 @@ if __name__ == "__main__":
         description="A RainbowTable built in python for a bonus college assignment."
     )
 
-    parser.add_argument(
-        "--rows",
-        type=int,
-        help="Rows to add to the table; If a table does not exist, creates this amount of rows.",
-        default=None,
-    )
+    # parser.add_argumnt(
+    #     "--rows",
+    #     type=int,
+    #     help="Rows to add to the table; If a table does not exist, creates this amount of rows.",
+    #     default=None,
+    # )
     parser.add_argument(
         "--steps",
         type=int,
@@ -26,16 +27,18 @@ if __name__ == "__main__":
     if args.steps and not args.rows:
         parser.error("--rows is required when --steps is specified.")
 
-    rt = RainbowTable(rows=args.rows, steps=args.steps or settings.default_steps)
+    rt = RainbowTable(steps=args.steps or settings.default_steps)
+    # rt.build(length=5, rows=10000)
 
     hashed_password = "1e65cf1485fa6b43f090a448feb1cd8931378e4c96daf245a6d96c264e55579b59ca80519d020cb394b7e501c71386d8aeaf503206de439c9d92558c8884812d"
     while hashed_password:
-        password = rt.check_password(hashed_password)
+        password = rt.check(hashed_password, 5)
 
+        print("\n----\n")
         if password:
-            print("Achou senha: ", password)
+            log.success(f"Achou senha: {password}")
         else:
-            print("Nao achou!")
+            log.error("Nao achou!")
         print("\n----\n")
 
         hashed_password = str(
