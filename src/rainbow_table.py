@@ -1,88 +1,18 @@
 import hashlib
 import random
 import time
-import sys
-from collections import defaultdict
 
 from tqdm import tqdm
 
-from settings import settings
-from storage import JSONStorage
 from logger import log
+from settings import settings
 
 
 class RainbowTable:
-    def __init__(self, steps=settings.default_steps):
+    def __init__(self, storage):
         self.alphabet = list(settings.alphabet)
-        self.storage = JSONStorage(settings.data_path / "table.json")
-        self.steps = steps
-
-        self.tables = {}
-        self.rows = {}
-
-        completion = self.__load()
-        if completion:
-            log.success(
-                f"Rainbow Table {completion} successfully. Current lengths: {list(self.rows.keys())}"
-            )
-
-    def __load(self):
-        """Loads all tables from the JSON file."""
-
-        data = self.storage.load()
-        loaded_steps = data.get("steps", self.steps)
-
-        if loaded_steps != self.steps:
-            log.warning(
-                f"Steps in storage ({loaded_steps}) do not match given steps ({self.steps})."
-            )
-
-            confirm = (
-                input("Do you want to continue with the given steps? (y/n): ")
-                .strip()
-                .lower()
-            )
-
-            if confirm != "y":
-                sys.exit("Exiting due to mismatch in steps.")
-
-            return "created"
-
-        loaded_tables = data.get("tables", {})
-        for length_str, table_dict in loaded_tables.items():
-            try:
-                length = int(length_str)
-                if not isinstance(table_dict, dict):
-                    log.warning(f"Data for length '{length}' is malformed. Skipping.")
-                    continue
-
-                processed_dict = {
-                    key: set(values) for key, values in table_dict.items()
-                }
-
-                self.tables[length] = defaultdict(set, processed_dict)
-                self.rows[length] = len(self.tables[length])
-
-            except (ValueError, TypeError) as e:
-                log.warning(
-                    f"Could not load table for key '{length_str}': {e}. Skipping."
-                )
-                continue
-
-        return "loaded" if self.tables else "created"
-
-    def __save(self):
-        tables_to_save = {
-            length: {
-                end_point: list(start_points)
-                for end_point, start_points in inner_table.items()
-            }
-            for length, inner_table in self.tables.items()
-        }
-
-        data = {"steps": self.steps, "tables": tables_to_save}
-        self.storage.save(data)
-        log.success("Tables saved!")
+        self.steps = settings.default_steps
+        self.storage = storage
 
     def __random_password(self, length):
         return "".join(random.choices(self.alphabet, k=length))
@@ -97,25 +27,34 @@ class RainbowTable:
 
     def build(self, rows, length):
         log.info(f"Building table for length {length} with {rows} rows...")
+
+        batch_size = int(rows * 0.1)
+
         start_time = time.perf_counter()
 
-        self.tables.setdefault(length, defaultdict(set))
+        with tqdm(total=rows, desc=f"==> Building (len={length})", unit="row") as pbar:
+            batch = []
+            for _ in range(rows):
+                start = self.__random_password(length)
+                end = start
+                for step in range(self.steps):
+                    h = self.__sha512_hash(end)
+                    end = self.__reduce(h, step, length)
 
-        for i in tqdm(range(rows), desc=f"==> Building (len={length})", unit="row"):
-            start = self.__random_password(length)
-            end = start
-            for step in range(self.steps):
-                h = self.__sha512_hash(end)
-                end = self.__reduce(h, step, length)
+                batch.append((start, end, length))
 
-            self.tables[length][end].add(start)
+                if len(batch) >= batch_size:
+                    self.storage.add_chains(batch)
+                    batch = []
 
-        self.rows[length] = len(self.tables[length])
-        self.__save()
+                pbar.update(1)
+
+            if batch:
+                self.storage.add_chains(batch)
 
         end_time = time.perf_counter()
-        log.info(
-            f"Time: {end_time - start_time:.2f}s. Total rows for length {length}: {self.rows[length]}"
+        log.success(
+            f"Build complete for length {length}. Time: {end_time - start_time:.2f}s"
         )
 
     def __regenerate(self, start, target_hash, length):
@@ -124,22 +63,33 @@ class RainbowTable:
             hashed_password = self.__sha512_hash(password)
             if hashed_password == target_hash:
                 return password
+
             password = self.__reduce(hashed_password, step, length)
+
         return None
 
     def check(self, hashed_password, length):
-        table_for_length = self.tables.get(length)
-        if not table_for_length:
-            log.warning(f"No table found for password length {length}.")
+        available_lengths = self.storage.get_available_lengths()
+
+        if length not in available_lengths:
+            log.warning(f"No tables with length {length} have been built yet.")
             return None
+
+        log.status(f"Checking hash against tables for length: {length}")
 
         for step in range(self.steps - 1, -1, -1):
             candidate = self.__reduce(hashed_password, step, length)
             for k in range(step + 1, self.steps):
                 candidate = self.__reduce(self.__sha512_hash(candidate), k, length)
 
-            for start in table_for_length.get(candidate, []):
+            start_candidates = self.storage.get_start_candidates(candidate, length)
+
+            for start in start_candidates:
                 password = self.__regenerate(start, hashed_password, length)
                 if password:
+                    log.success(f"Password found with length {length}!")
                     return password
+
+        log.info(f"Password not found for length: {length}")
+
         return None

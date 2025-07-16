@@ -49,5 +49,12 @@ class Logger:
         """Logs an error message."""
         self._log(message, Status.ERROR)
 
+    def status(self, message: str):
+        """Logs normal status message."""
+        self.console.print(
+            f"==> {message}",
+            highlight=False,
+        )
+
 
 log = Logger()
