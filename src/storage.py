@@ -1,4 +1,5 @@
 import sqlite3
+import time
 import sys
 from logger import log
 
@@ -81,6 +82,26 @@ class ChainStorage:
             with self.conn:
                 cursor = self.conn.cursor()
                 cursor.execute(query)
+                return [row[0] for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            log.error(f"Get lengths query failed: {e}")
+            return []
+
+    def count_row_length(self):
+        if not self.conn:
+            return None
+
+        query = "SELECT length, COUNT(*) as tamanho FROM chains GROUP BY length"
+
+        try:
+            with self.conn:
+                cursor = self.conn.cursor()
+                start_time = time.perf_counter()
+                cursor.execute(query)
+                end_time = time.perf_counter()
+                log.success(
+                    f"Found lengths: {cursor.fetchall()} in Time: {end_time - start_time:.2f}s"
+                )
                 return [row[0] for row in cursor.fetchall()]
         except sqlite3.Error as e:
             log.error(f"Get lengths query failed: {e}")

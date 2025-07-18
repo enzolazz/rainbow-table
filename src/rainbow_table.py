@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from logger import log
 from settings import settings
+from concurrent.futures import ThreadPoolExecutor
 
 
 class RainbowTable:
@@ -59,7 +60,7 @@ class RainbowTable:
 
     def __regenerate(self, start, target_hash, length):
         password = start
-        for step in range(self.steps):
+        for step in range(self.steps + 1):
             hashed_password = self.__sha512_hash(password)
             if hashed_password == target_hash:
                 return password
@@ -68,28 +69,46 @@ class RainbowTable:
 
         return None
 
-    def check(self, hashed_password, length):
+    def check(self, hashed_password):
         available_lengths = self.storage.get_available_lengths()
 
-        if length not in available_lengths:
-            log.warning(f"No tables with length {length} have been built yet.")
+        if not available_lengths:
+            log.warning("No rainbow tables available.")
             return None
 
-        log.status(f"Checking hash against tables for length: {length}")
+        log.info(f"Checking hash against {len(available_lengths)} lengths...")
 
-        for step in range(self.steps - 1, -1, -1):
-            candidate = self.__reduce(hashed_password, step, length)
-            for k in range(step + 1, self.steps):
-                candidate = self.__reduce(self.__sha512_hash(candidate), k, length)
+        def try_lengths(length):
+            storage = self.storage.__class__(self.storage.db_path)
 
-            start_candidates = self.storage.get_start_candidates(candidate, length)
+            if length not in storage.get_available_lengths():
+                log.warning(f"[Thread] No table for length {length}")
+                return None
 
-            for start in start_candidates:
-                password = self.__regenerate(start, hashed_password, length)
-                if password:
-                    log.success(f"Password found with length {length}!")
-                    return password
+            log.status(f"[Thread] Checking length {length}")
 
-        log.info(f"Password not found for length: {length}")
+            for step in range(self.steps - 1, -1, -1):
+                candidate = self.__reduce(hashed_password, step, length)
+                for k in range(step + 1, self.steps):
+                    candidate = self.__reduce(self.__sha512_hash(candidate), k, length)
+
+                start_candidates = storage.get_start_candidates(candidate, length)
+
+                for start in start_candidates:
+                    password = self.__regenerate(start, hashed_password, length)
+                    if password:
+                        log.success(f"Password found with length {length}!")
+                        return password
+
+            log.info(f"Password not found for length: {length}")
+
+            return None
+
+        with ThreadPoolExecutor(max_workers=len(available_lengths)) as executor:
+            results = list(executor.map(try_lengths, available_lengths))
+
+        for result in results:
+            if result:
+                return result
 
         return None

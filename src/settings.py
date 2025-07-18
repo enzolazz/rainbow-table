@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     app_mode: str = "production"
     data_path: Path = ROOT_PATH / "data"
     min_password_length: int = 5
-    stop_probability: float = 0.125
 
     alphabet: str = string.ascii_letters + string.digits + "!@#%&*()"
     alphabet_size: int = alphabet.__len__()
