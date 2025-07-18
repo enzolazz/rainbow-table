@@ -1,3 +1,6 @@
+# Ignore database: it will be pushed via curl from drive.
+data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
